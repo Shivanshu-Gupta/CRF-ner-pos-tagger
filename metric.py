@@ -150,9 +150,7 @@ class AccuracyPerLabel(Metric):
         mask = mask.view(-1).tolist()
         assert len(predictions) == len(gold_labels) == len(mask)
 
-        # TODO: Update self.correct_count and self.total_count with counts
-        # You should add to the values already stored there.
-        # See the `Accuracy.__call__()` to see an example of this.
+        # Update self.correct_count and self.total_count with counts
         for pred, gold, m in zip(predictions, gold_labels, mask):
             # if the current mask value has a 1
             if m == 1:

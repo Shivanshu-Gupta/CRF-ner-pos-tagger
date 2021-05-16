@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-class Vocabulary():
+class Vocabulary:
     """ Object holding vocabulary and mappings
     Args:
         word_list: ``list`` A list of words. Words assumed to be unique.

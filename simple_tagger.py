@@ -1,6 +1,7 @@
 from typing import Dict
 import torch
 
+
 from dataset import Vocabulary
 from metric import Accuracy, AccuracyPerLabel, Average
 from util import load_embeddings, load_object_from_dict
@@ -17,7 +18,7 @@ class SimpleTagger(torch.nn.Module):
     ):
         super(SimpleTagger, self).__init__()
         self._embeddings = load_embeddings(**embeddings, token_vocab=token_vocab)
-        self._encoder = load_object_from_dict(encoder)
+        self._encoder = load_object_from_dict(encoder, input_size=embeddings['embedding_dim'])
         self._tag_projection = load_object_from_dict(tag_projection)
 
         self.token_vocab = token_vocab
