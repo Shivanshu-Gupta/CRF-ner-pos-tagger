@@ -1,5 +1,5 @@
 import numpy as np
-
+from pdb import set_trace
 
 def run_viterbi(emission_scores, trans_scores, start_scores, end_scores):
     """Run the Viterbi algorithm.
@@ -23,10 +23,28 @@ def run_viterbi(emission_scores, trans_scores, start_scores, end_scores):
     assert trans_scores.shape[1] == L
     assert emission_scores.shape[1] == L
     N = emission_scores.shape[0]
-
-    y = []
-    for i in range(N):
-        # stupid sequence
-        y.append(i % L)
+    try:
+        dp = np.zeros([N, L])
+        bp = np.zeros([N-1, L], dtype=np.int)
+        dp[0] = start_scores + emission_scores[0]
+        for i in range(1, N):
+            dp[i] = emission_scores[i]
+            for j in range(L):
+                _j = np.argmax(trans_scores[:, j] + dp[i-1])
+                dp[i][j] = emission_scores[i][j] + trans_scores[_j, j] + dp[i - 1][_j]
+                bp[i-1][j] = _j
+        final_scores = end_scores + dp[N-1]
+        best_score = final_scores.max()
+        best_seq = [np.argmax(final_scores)]
+        for i in range(N-1):
+            best_seq.append(bp[N-2-i][best_seq[-1]])
+        best_seq.reverse()
+    except:
+        set_trace()
+    return (best_score, best_seq)
+    # y = []
+    # for i in range(N):
+    #     # stupid sequence
+    #     y.append(i % L)
     # score set to 0
-    return (0.0, y)
+    # return (0.0, y)
