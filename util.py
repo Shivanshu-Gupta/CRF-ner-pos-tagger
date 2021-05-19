@@ -1,16 +1,18 @@
 import attr
 import ntpath
+from numpy.lib.arraysetops import isin
+import torch
 
-def load_embeddings(token_vocab, embedding_dim=None, embedding_path=None):
+def load_embeddings(token_vocab, embedding_param='50'):
     import torch
-    import torch.nn as nn
-    import numpy as np
+    glove = [f'embeddings/glove.twitter.27B.{dim}d.bin'
+             for dim in [25, 50, 100, 200]]
+    word2vec = ['embeddings/word2vec_twitter_tokens.bin']
+    fasttext = ['embeddings/fasttext_twitter_raw.bin']
+    valid_embedding_paths = set(glove + word2vec + fasttext)
 
-    # initialize embeddings randomly
-    if embedding_path is None:
-        embeddings = torch.nn.Embedding(len(token_vocab), embedding_dim)
     # read in pretrained embeddings
-    else:
+    if embedding_param in valid_embedding_paths:
         # word_list = []
         # embeddings_list = []
         # with open(embedding_path, encoding='utf-8') as f:
@@ -26,14 +28,14 @@ def load_embeddings(token_vocab, embedding_dim=None, embedding_path=None):
         # embeddings = torch.nn.Embedding(len(embeddings_list), embedding_dim)
         # # set embedding weights to the embeddings we loaded
         # embeddings.weight.data.copy_(torch.vstack(embeddings_list))
-
+        embedding_path = embedding_param
         filename = ntpath.basename(embedding_path)
         if filename.startswith("word2vec") or filename.startswith("glove"):
             from gensim.models.keyedvectors import KeyedVectors
-            emb_model = KeyedVectors.load_word2vec_format(embedding_path, binary=True)
+            emb_model = KeyedVectors.load_word2vec_format(embedding_path, binary=True, unicode_errors='ignore')
         elif filename.startswith("fasttext"):
             from gensim.models.fasttext import load_facebook_vectors
-            emb_model = load_facebook_vectors('fasttext_twitter_raw.bin')
+            emb_model = load_facebook_vectors(embedding_path)
         else:
             raise Exception("Unsuported word vectors")
 
@@ -49,6 +51,9 @@ def load_embeddings(token_vocab, embedding_dim=None, embedding_path=None):
 
         # update word list in token vocabulary with words from embedding file
         token_vocab.word_list = word_list
+    else:
+        # initialize embeddings randomly
+        embeddings = torch.nn.Embedding(len(token_vocab), int(embedding_param))
 
     return embeddings
 
@@ -63,10 +68,11 @@ def create_object_from_class_string(module_name, class_name, parameters):
 
 def load_object_from_dict(parameters, **kwargs):
     if not isinstance(parameters, dict):
-        parameters = attr.asdict(parameters)
+        # parameters = attr.asdict(parameters)
+        parameters = vars(parameters).copy()
     parameters.update(kwargs)
     type = parameters.pop('type')
-    if type is None:
+    if not type:
         return None
     else:
         type = type.split('.')
@@ -80,3 +86,28 @@ def load_object_from_dict(parameters, **kwargs):
 #         return None
 #     else:
 #         return clazz(**parameters)
+
+def get_device(gpu_idx):
+    device = 'cpu'
+    if gpu_idx != -1 and torch.cuda.is_available():
+        device = f'cuda:{gpu_idx}'
+    return device
+
+def nest_dict(flat, sep='.'):
+    result = {}
+    for k, v in flat.items():
+        _nest_dict_rec(k, v, result, sep=sep)
+    return result
+
+def _nest_dict_rec(k, v, out, sep='.'):
+    k, *rest = k.split(sep, 1)
+    if rest:
+        _nest_dict_rec(rest[0], v, out.setdefault(k, {}))
+    else:
+        out[k] = v
+
+def output(string, filepath=None):
+    print(string)
+    if filepath is not None:
+        with open(filepath, 'w') as outf:
+            outf.write(string + '\n')

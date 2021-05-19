@@ -1,7 +1,8 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 from typing import Optional, Any
 
 import torch
+import torch.nn as nn
 
 from dataset import Vocabulary
 from metric import Accuracy, AccuracyPerLabel, Average
@@ -249,14 +250,21 @@ class NeuralCrf(torch.nn.Module):
         self,
         token_vocab: Vocabulary,
         tag_vocab: Vocabulary,
-        embeddings: Dict,
+        embedding_param: Union[int, str],
         encoder: Dict,
         tag_projection: Dict
     ):
         super(NeuralCrf, self).__init__()
-        self._embeddings = load_embeddings(**embeddings, token_vocab=token_vocab)
-        self._encoder = load_object_from_dict(encoder)
-        self._tag_projection = load_object_from_dict(tag_projection)
+        self._embeddings: nn.Embedding = load_embeddings(embedding_param=embedding_param, token_vocab=token_vocab)
+        output_size = self._embeddings.embedding_dim
+        self._encoder = load_object_from_dict(encoder, input_size=output_size)
+        if self._encoder is not None:
+            output_size = self._encoder.hidden_size
+            if self._encoder.bidirectional:
+                output_size *= 2
+        self._tag_projection = load_object_from_dict(tag_projection, in_features=output_size)
+
+        print(self)
 
         self.token_vocab = token_vocab
         self.tag_vocab = tag_vocab

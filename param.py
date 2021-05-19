@@ -1,8 +1,12 @@
 import attr
-import torch
+import cattr
+import pandas as pd
 from collections.abc import Mapping
+from typing import Union
 from itertools import product
 from copy import deepcopy
+
+from util import nest_dict
 
 @attr.s(auto_attribs=True)
 class DictDataClass(Mapping):
@@ -19,6 +23,26 @@ class DictDataClass(Mapping):
 
     def __len__(self):
         return len(vars(self))
+
+    def to_flattened_dict(self, sep='.'):
+        _d = pd.json_normalize(attr.asdict(self), sep=sep).iloc[0].to_dict()
+        d = {}
+        for k, v in _d.items():
+            if k.endswith('grid_search'):
+                parts = k.split(sep)
+                d[sep.join(parts[:-1])] = {'grid_search': v}
+            else:
+                d[k] = v
+        return d
+
+    @classmethod
+    def from_flattened_dict(cls, d: dict):
+        return cls.from_dict(nest_dict(d))
+
+    @classmethod
+    def from_dict(cls, d: dict):
+        converter = cattr.Converter()
+        return converter.structure(d, cls)
 
 class Settings(list):
     def __init__(self, *args, **kwargs):
@@ -54,16 +78,15 @@ class DataParams(Parameters):
 
 @attr.s(auto_attribs=True)
 class EmbeddingParams(Parameters):
-    embedding_dim: int = 50
-    # embedding_path: str = "embeddings/glove.twitter.27B/glove.twitter.27B.50d.bin"
+    embedding: Union[int, str] = 50
+
+# @attr.s(auto_attribs=True)
+# class EncoderParams(Parameters):
+#     type: str = ''
 
 @attr.s(auto_attribs=True)
 class EncoderParams(Parameters):
-    type: str = None
-
-@attr.s(auto_attribs=True)
-class RNNEncoderParams(EncoderParams):
-    type: str = 'torch.nn.LSTM'
+    type: str = ''
     hidden_size: int = 100
     num_layers: int = 1
     bias: bool = True
@@ -73,16 +96,16 @@ class RNNEncoderParams(EncoderParams):
 @attr.s(auto_attribs=True)
 class ProjectionParams(Parameters):
     type: str = 'torch.nn.Linear'
-    in_features: int = 50
+    # in_features: int = 50
     out_features: int = 13
 
 @attr.s(auto_attribs=True)
 class ModelParams(Parameters):
     type: str = 'simple_tagger.SimpleTagger'
-    embeddings: EmbeddingParams = EmbeddingParams()
-    encoder: EncoderParams = EncoderParams()
-    # encoder: EncoderParams = RNNEncoderParams()
-    tag_projection: ProjectionParams = ProjectionParams()
+    embedding_param: str = '50'
+    # embeddings: EmbeddingParams = attr.ib(default=attr.Factory(lambda: EmbeddingParams()))
+    encoder: EncoderParams = attr.ib(default=attr.Factory(lambda: EncoderParams()))
+    tag_projection: ProjectionParams = attr.ib(default=attr.Factory(lambda: ProjectionParams()))
 
 @attr.s(auto_attribs=True)
 class OptimizerParams(Parameters):
@@ -90,19 +113,29 @@ class OptimizerParams(Parameters):
     lr: float = 0.001
 
 @attr.s(auto_attribs=True)
+class SGDOptimizerParams(OptimizerParams):
+    type: str = 'torch.optim.SGD'
+    lr: float = 0.001
+    momentum: float = 0.1
+
+@attr.s(auto_attribs=True)
 class TrainingParams(Parameters):
-    batch_size: int = 32
-    num_epochs: int = 40
-    optimizer: OptimizerParams = OptimizerParams()
+    num_epochs: int = 30
+    optimizer: OptimizerParams = attr.ib(default=attr.Factory(lambda: OptimizerParams()))
 
 @attr.s(auto_attribs=True)
 class TaggingParams(Parameters):
     random_seed: int = 42
+    gpu_idx: int = -1
     dataset: str = 'ner'
-    train_dataset: DataParams = DataParams(data_path="data/twitter_train.ner")
-    validation_dataset: DataParams = DataParams(data_path="data/twitter_dev.ner")
-    model: ModelParams = ModelParams()
-    training: TrainingParams = TrainingParams()
+    train_dataset: DataParams = attr.ib(default=attr.Factory(lambda: DataParams(data_path="data/twitter_train.ner")))
+    validation_dataset: DataParams = attr.ib(default=attr.Factory(lambda: DataParams(data_path="data/twitter_dev.ner")))
+    train_batch_size: int = 32
+    val_batch_size: int = 64
+    model: ModelParams = attr.ib(default=attr.Factory(lambda: ModelParams()))
+    training: TrainingParams = attr.ib(default=attr.Factory(lambda: TrainingParams()))
+    search_name: str = ''
+    is_grid: bool = True
 
     def __attrs_post_init__(self):
         if self.dataset == 'ner':
@@ -114,7 +147,7 @@ class TaggingParams(Parameters):
             self.validation_dataset.data_path = "data/twitter_dev.pos"
             self.model.tag_projection.out_features = 13
 
-params = TaggingParams()
+# params = TaggingParams()
 # params.model.encoder = [EncoderParams(),
 #                         RNNEncoderParams(hidden_size=[50, 100])]
 
