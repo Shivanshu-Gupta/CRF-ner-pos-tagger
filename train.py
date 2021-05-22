@@ -39,7 +39,7 @@ def load_datasets(train_dataset_params: Union[dict, DataParams],
 def train(train_dataloader: DataLoader,
           model: torch.nn.Module,
           optimizer: torch.optim.Optimizer,
-          device) -> dict:
+          device):
     model.train()
     # for batch in tqdm(train_dataloader, f'Epoch {epoch_num}'):
     for batch in train_dataloader:
@@ -53,12 +53,13 @@ def train(train_dataloader: DataLoader,
 
 def eval(validation_dataloader: DataLoader,
          model: torch.nn.Module,
-         device) -> dict:
+         device):
     model.eval()
     for batch in validation_dataloader:
         batch = {k: v.to(device) for k, v in batch.items()}
         model(**batch)
     return model.get_metrics(header='val_')
+
 
 def run_train_epoch(epoch_num, model, trn_loader, val_loader, optimizer, device, experiment=None):
     curr_epoch_metrics = train(trn_loader, model, optimizer, device)
@@ -81,29 +82,30 @@ def train_w_tuning(checkpoint=False, experiment=None, **train_params):
                 path = os.path.join(checkpoint_dir, "checkpoint")
                 torch.save(train_params['model'].state_dict(), path)
 
-def train_wo_tuning(serialization_dir=None, experiment=None, **train_params):
+def train_wo_tuning(serialization_dir=None, silent=False, experiment=None, **train_params):
     start = time.time()
-    best_metrics = {'val_loss': 10e10}
+    # best_metrics = {'val_loss': 10e10}
+    best_metrics = {'val_accuracy': 0}
     best_model = None
     num_epochs = train_params['num_epochs']
     train_params.pop('num_epochs')
     for epoch_num in range(num_epochs):
         curr_epoch_metrics = run_train_epoch(epoch_num, experiment=experiment, **train_params)
-        print(curr_epoch_metrics)
         # write the current epochs statistics to file
         curr_epoch_metrics['epoch_num'] = epoch_num
         output(json.dumps(curr_epoch_metrics, indent=4),
-            filepath=f'{serialization_dir}/metrics_epoch_{epoch_num}.json')
+            filepath=f'{serialization_dir}/metrics_epoch_{epoch_num}.json',
+            silent=silent)
 
         # check if current model is the best so far.
-        if curr_epoch_metrics['val_loss'] < best_metrics['val_loss']:
-            print('Best validation loss thus far...\n')
+        if curr_epoch_metrics['val_accuracy'] > best_metrics['val_accuracy']:
+            if not silent: print('Best validation loss thus far...\n')
             best_model = copy.deepcopy(train_params['model'])
             best_metrics = copy.deepcopy(curr_epoch_metrics)
 
     # write the best metrics we got and best model
     best_metrics['run_time'] = str(datetime.timedelta(seconds=time.time() - start))
-    output(f"Best Performing Model {json.dumps(best_metrics, indent=4)}",
+    output(json.dumps(best_metrics, indent=4),
             filepath=f'{serialization_dir}/best_metrics.json')
     torch.save(best_model, f'{serialization_dir}/model.pt')
 
@@ -114,10 +116,11 @@ def train_tagger(config: Union[dict, TaggingParams],
                  serialization_dir: str = None,
                  checkpoint_dir: str =None,
                  root_dir: str = None,
-                 usecomet: bool = False):
+                 usecomet: bool = False,
+                 silent=False):
     if tuning:
         os.chdir(root_dir)
-    print(config)
+    if not silent: print(config)
 
     if usecomet:
         experiment = Experiment(project_name=config['dataset'])
@@ -164,19 +167,22 @@ def train_tagger(config: Union[dict, TaggingParams],
     if usecomet:
         with experiment.train():
             if tuning: train_w_tuning(checkpoint=checkpoint, experiment=experiment, **train_params)
-            else: train_wo_tuning(serialization_dir=serialization_dir, experiment=experiment, **train_params)
+            else: train_wo_tuning(serialization_dir=serialization_dir, silent=silent, experiment=experiment, **train_params)
     else:
         if tuning: train_w_tuning(checkpoint=checkpoint, **train_params)
-        else: train_wo_tuning(serialization_dir=serialization_dir, **train_params)
+        else: train_wo_tuning(serialization_dir=serialization_dir, silent=silent, **train_params)
 
 
 
-def test(test_dataloader: DataLoader,
-         model: torch.nn.Module,
-         device) -> dict:
+def test(tst_loader: DataLoader, model: torch.nn.Module, device,
+         serialization_dir: str = None) -> dict:
     model.eval()
     with torch.no_grad():
-        for batch in tqdm(test_dataloader):
+        for batch in tqdm(tst_loader):
             batch = {k: v.to(device) for k, v in batch.items()}
             model(**batch)
-    return model.get_metrics(header='tst_')
+    tst_metrics = model.get_metrics(header='tst_')
+    output(json.dumps(tst_metrics, indent=4),
+            filepath=f'{serialization_dir}/test_metrics.json')
+    return tst_metrics
+

@@ -1,6 +1,4 @@
-import attr
 import ntpath
-from numpy.lib.arraysetops import isin
 import torch
 
 def load_embeddings(token_vocab, embedding_param='50'):
@@ -13,21 +11,6 @@ def load_embeddings(token_vocab, embedding_param='50'):
 
     # read in pretrained embeddings
     if embedding_param in valid_embedding_paths:
-        # word_list = []
-        # embeddings_list = []
-        # with open(embedding_path, encoding='utf-8') as f:
-        #     for line in f:
-        #         line = line.split()
-        #         word_list.append(line[0])
-        #         embeddings_list.append(torch.Tensor(list(map(float, line[1:]))))
-
-        # # create embeddings for special tokens (e.g. UNK)
-        # for _ in range(len(token_vocab.special_tokens)):
-        #     embeddings_list.append(torch.FloatTensor(embedding_dim).uniform_(-0.1, 0.1))
-        # # init a random Embedding object
-        # embeddings = torch.nn.Embedding(len(embeddings_list), embedding_dim)
-        # # set embedding weights to the embeddings we loaded
-        # embeddings.weight.data.copy_(torch.vstack(embeddings_list))
         embedding_path = embedding_param
         filename = ntpath.basename(embedding_path)
         if filename.startswith("word2vec") or filename.startswith("glove"):
@@ -79,14 +62,6 @@ def load_object_from_dict(parameters, **kwargs):
         module_name, class_name = '.'.join(type[:-1]), type[-1]
         return create_object_from_class_string(module_name, class_name, parameters)
 
-# def load_object_from_dict(parameters: dict, **kwargs):
-#     parameters.update(kwargs)
-#     clazz = parameters.pop('type')
-#     if clazz is None:
-#         return None
-#     else:
-#         return clazz(**parameters)
-
 def get_device(gpu_idx):
     device = 'cpu'
     if gpu_idx != -1 and torch.cuda.is_available():
@@ -106,8 +81,52 @@ def _nest_dict_rec(k, v, out, sep='.'):
     else:
         out[k] = v
 
-def output(string, filepath=None):
-    print(string)
+def output(string, filepath=None, silent=False):
+    if not silent: print(string)
     if filepath is not None:
         with open(filepath, 'w') as outf:
             outf.write(string + '\n')
+
+def get_search_name(dataset='ner', model='simple', emb=True, enc=1, sep='-', hyperopt=False):
+    if hyperopt:
+        name = ['hyperopt']
+    else:
+        name = ['search']
+
+    name.append(dataset)
+
+    if model == 'crf':
+        name.append('crf')
+    else:
+        name.append('simple')
+
+    if emb:
+        name.append('emb')
+
+    if enc == 1:
+        name.append('enc1')
+    elif enc == 2:
+        name.append('enc2')
+
+    return sep.join(name)
+
+def get_model_name(model='simple', emb=True, enc=1, sep='-'):
+    name = []
+    if model == 'crf':
+        name.append('crf')
+    else:
+        name.append('simple')
+
+    if emb:
+        name.append('emb')
+
+    if enc != 0:
+        name.append('enc')
+    return sep.join(name)
+
+def get_configuration_name(emb=True, enc=1, sep='+'):
+    name = []
+    if emb: name.append('\textsc{pretrained}')
+    else: name.append('\textsc{random}')
+    if enc != 0: name.append('\textsc{encoder}')
+    return sep.join(name)

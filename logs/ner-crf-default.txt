@@ -1,0 +1,25 @@
+/Users/shivanshu/miniconda3/envs/dl/lib/python3.8/site-packages/gensim/similarities/__init__.py:15: UserWarning: The gensim.similarities.levenshtein submodule is disabled, because the optional Levenshtein package <https://pypi.org/project/python-Levenshtein/> is unavailable. Install Levenhstein (e.g. `pip install python-Levenshtein`) to suppress this warning.
+  warnings.warn(msg)
+/Users/shivanshu/miniconda3/envs/dl/lib/python3.8/site-packages/ray/autoscaler/_private/cli_logger.py:57: FutureWarning: Not all Ray CLI dependencies were found. In Ray 1.4+, the Ray CLI, autoscaler, and dashboard will only be usable via `pip install 'ray[default]'`. Please update your install command.
+  warnings.warn(
+{'dataset': 'ner',
+ 'gpu_idx': 0,
+ 'is_grid': True,
+ 'model': {'embedding_param': '50',
+           'encoder': {'bias': True,
+                       'bidirectional': True,
+                       'dropout': 0,
+                       'hidden_size': 100,
+                       'num_layers': 1,
+                       'type': ''},
+           'tag_projection': {'out_features': 22, 'type': 'torch.nn.Linear'},
+           'type': 'neural_crf.NeuralCrf'},
+ 'random_seed': 42,
+ 'search_name': '',
+ 'train_batch_size': 32,
+ 'train_dataset': {'data_path': 'data/twitter_train.ner'},
+ 'training': {'num_epochs': 20,
+              'optimizer': {'lr': 0.001, 'type': 'torch.optim.Adam'}},
+ 'val_batch_size': 64,
+ 'validation_dataset': {'data_path': 'data/twitter_dev.ner'}}
+models/ner/crf-default

@@ -1,36 +1,98 @@
 import os
 import sys
+import pandas as pd
+from pprint import pprint
 from pdb import set_trace
 from comet_ml import Experiment
-
-import torch
-from torch.utils.data import DataLoader
 
 import ray
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 from ray.tune.suggest.hyperopt import HyperOptSearch
 
-import search_config
-from param import TaggingParams
-from util import load_object_from_dict, get_device
-from train import load_datasets, train_tagger, test
+from search_analysis import get_best_config
+from param import TaggingParams, EncoderParams, OptimizerParams
+from util import get_search_name
+from train import train_tagger
+
+
+glove = [f'embeddings/glove.twitter.27B.{dim}d.bin' for dim in [25, 50, 100, 200]]
+word2vec = ['embeddings/word2vec_twitter_tokens.bin']
+fasttext = ['embeddings/fasttext_twitter_raw.bin']
+emb_paths = glove
+dropout_options = [0, 0.05, 0.1, 0.2, 0.3]
+lr_options = [1e-3, 3e-3, 1e-2, 3e-2, 0.1]
+
+grid_sizes = {
+    (False, 0): 2 * len(lr_options),        # 10
+    (True, 0): len(emb_paths) * len(lr_options),    # 20
+    (False, 1): 2 * 2 * 2 * len(lr_options),    # 40
+    (True, 1): len(emb_paths) * 2 * 2 * len(lr_options),    # 80
+    (False, 2): 2 * 2 * 2 * len(dropout_options) * len(lr_options), # 200
+    (True, 2): len(emb_paths) * 2 * 2 * len(dropout_options) * len(lr_options)  # 400
+}
+
+hyperopt_num_samples = {
+    (False, 0): 10,
+    (True, 0): 20,
+    (False, 1): 40,
+    (True, 1): 80,
+    (False, 2): 100,
+    (True, 2): 200,
+}
+
+
+def get_search_space(dataset='ner', model='simple', emb=True, enc=1, hyperopt=False):
+    params = TaggingParams(dataset=dataset)
+
+    if model == 'crf': params.model.type = 'neural_crf.NeuralCrf'
+
+    choices = tune.choice if hyperopt else tune.grid_search
+
+    if emb: params.model.embedding_param = choices(emb_paths)
+    else: params.model.embedding_param = choices(['25', '50'])
+
+    if enc == 1:
+        params.model.encoder = EncoderParams(
+            type='torch.nn.LSTM',
+            hidden_size=choices([50, 100]),
+            num_layers=1,
+            dropout=0,
+            bidirectional=choices([True, False])
+        )
+    elif enc == 2:
+        params.model.encoder = EncoderParams(
+            type='torch.nn.LSTM',
+            hidden_size=choices([50, 100]),
+            num_layers=2,
+            # dropout=tune.uniform(0, 0.3),
+            dropout=tune.grid_search(dropout_options) if not hyperopt else tune.uniform(0, 0.3),
+            bidirectional=choices([True, False])
+        )
+    params.training.optimizer = OptimizerParams(lr=tune.grid_search(lr_options) if not hyperopt else tune.loguniform(1e-3, 0.1))
+    params.training.num_epochs = 30
+    params.is_grid = not hyperopt
+    params.search_name = get_search_name(dataset, model, emb, enc, hyperopt=hyperopt)
+    return params
 
 
 # __main_begin__
 def main(config: TaggingParams, name: str, num_samples=10,
-         max_num_epochs=10, gpus_per_trial=1, checkpoint=True, usecomet=False):
+         max_num_epochs=10, gpus_per_trial=1, checkpoint=True,
+         usecomet=False, current_best_params=[]):
     scheduler = ASHAScheduler(
         max_t=max_num_epochs,
         grace_period=5,
         reduction_factor=2)
     print(config)
-    print(config.to_flattened_dict())
+    pprint(config.to_flattened_dict())
     # Specify the search space and maximize score
     search_alg = None
     if not config.is_grid:
+        print(current_best_params)
         search_alg = HyperOptSearch(metric="val_accuracy", mode="max",
-                                    random_state_seed=config.random_seed)
+                                    random_state_seed=config.random_seed,
+                                    points_to_evaluate=current_best_params)
     else:
         num_samples = 1
 
@@ -50,32 +112,13 @@ def main(config: TaggingParams, name: str, num_samples=10,
         log_to_file=True,
         verbose=1
     )
+    df: pd.DataFrame = results.dataframe()
+    best_config = results.get_best_config()
+    best_results = df.loc[df['val_accuracy'].idxmax()].to_dict()
 
-    best_trial = results.get_best_trial(metric="val_loss", mode="min", scope="all")
-    print("Best trial config: {}".format(best_trial.config))
-    print("Best trial final validation loss: {}".format(
-        best_trial.last_result["val_loss"]))
-    print("Best trial final validation accuracy: {}".format(
-        best_trial.last_result["val_accuracy"]))
-
-    if checkpoint:
-        best_params = TaggingParams.from_flattened_dict(best_trial.config)
-        train_dataset, validation_dataset = load_datasets(
-            train_dataset_params=best_params.train_dataset,
-            validation_dataset_params=best_params.validation_dataset
-        )
-        validation_dataloader = DataLoader(validation_dataset, best_params.val_batch_size)
-
-        best_model = load_object_from_dict(best_params['model'],
-                                        token_vocab=train_dataset.token_vocab,
-                                        tag_vocab=train_dataset.tag_vocab)
-        device = get_device(config.gpu_idx)
-        best_model.to(device)
-        checkpoint_path = os.path.join(best_trial.checkpoint.value, "checkpoint")
-        best_model.load_state_dict(torch.load(checkpoint_path))
-
-        test_acc = test(validation_dataloader, best_model, device)
-        print("Best trial test set accuracy: {}".format(test_acc))
+    print(f"Best trial config: {best_config}")
+    print(f'Best trial final validation loss: {best_results["val_loss"]}')
+    print(f'Best trial final validation accuracy: {best_results["val_accuracy"]}')
     # set_trace()
 # __main_end__
 
@@ -89,15 +132,19 @@ if __name__ == "__main__":
     parser.add_argument('--enc', type=int, default=0)
     parser.add_argument('--gpu_idx', type=int, default=-1)
     parser.add_argument('--gpus_per_trial', type=int, default=0)
-    parser.add_argument('--num_samples', type=int, default=10)
+    parser.add_argument('--num_samples', type=int, default=1)
     parser.add_argument("--smoke-test", action="store_true", help="Finish quickly for testing")
     parser.add_argument("--checkpoint", action="store_true")
     parser.add_argument('--usecomet', action='store_true')
+    parser.add_argument('--usehyperopt', action='store_true')
     args, _ = parser.parse_known_args()
 
-    config: TaggingParams = search_config.get_search_space(args.dataset, args.model, args.emb, args.enc)
+    config: TaggingParams = get_search_space(args.dataset, args.model, args.emb, args.enc,
+                                             hyperopt=args.usehyperopt)
     config.gpu_idx = args.gpu_idx
+    num_samples = hyperopt_num_samples[(args.emb, args.enc)] if args.usehyperopt else args.num_samples
     print(config.search_name)
+    print(num_samples)
     # sys.exit()
 
     # shutdown currently running instance
@@ -109,7 +156,10 @@ if __name__ == "__main__":
              gpus_per_trial=0, checkpoint=args.checkpoint)
     else:
         ray.init(dashboard_host="0.0.0.0")
-        # Change this to activate training on GPUs
-        main(config, name=config.search_name, num_samples=args.num_samples,
-             max_num_epochs=config.training.num_epochs, gpus_per_trial=args.gpus_per_trial,
-             checkpoint=args.checkpoint, usecomet=args.usecomet)
+        if args.usehyperopt: current_best_params = [get_best_config(args.dataset, args.model, args.emb, args.enc)]
+        else: current_best_params = []
+
+        main(config, name=config.search_name, num_samples=num_samples,
+             max_num_epochs=config.training.num_epochs,
+             gpus_per_trial=args.gpus_per_trial,checkpoint=args.checkpoint,
+             usecomet=args.usecomet, current_best_params=current_best_params)

@@ -8,6 +8,10 @@ from copy import deepcopy
 
 from util import nest_dict
 
+datasets = ['ner', 'pos']
+models = ['simple', 'crf']
+
+
 @attr.s(auto_attribs=True)
 class DictDataClass(Mapping):
     """Allow dict-like access to attributes using ``[]`` operator in addition to dot-access."""
@@ -26,6 +30,7 @@ class DictDataClass(Mapping):
 
     def to_flattened_dict(self, sep='.'):
         _d = pd.json_normalize(attr.asdict(self), sep=sep).iloc[0].to_dict()
+        # hack to fix tune.grid_search() values as they are themselves dicts
         d = {}
         for k, v in _d.items():
             if k.endswith('grid_search'):
@@ -44,9 +49,6 @@ class DictDataClass(Mapping):
         converter = cattr.Converter()
         return converter.structure(d, cls)
 
-class Settings(list):
-    def __init__(self, *args, **kwargs):
-        super(Settings, self).__init__(args[0])
 
 class Parameters(DictDataClass):
     def get_settings(self):
@@ -56,9 +58,8 @@ class Parameters(DictDataClass):
             if isinstance(v, Parameters):
                 value_lists.append(v.get_settings())
                 keys.append(k)
-            # elif isinstance(v, Settings):
             elif isinstance(v, list):
-                assert(len(v) > 0)
+                assert (len(v) > 0)
                 if isinstance(v[0], Parameters):
                     value_lists.append([s for _v in v for s in _v.get_settings()])
                 else:
@@ -71,14 +72,17 @@ class Parameters(DictDataClass):
             settings.append(deepcopy(self))
         return settings
 
+
 @attr.s(auto_attribs=True)
 class DataParams(Parameters):
     data_path: str = None
     max_length = 30
 
+
 @attr.s(auto_attribs=True)
 class EmbeddingParams(Parameters):
     embedding: Union[int, str] = 50
+
 
 # @attr.s(auto_attribs=True)
 # class EncoderParams(Parameters):
@@ -93,11 +97,13 @@ class EncoderParams(Parameters):
     dropout: float = 0
     bidirectional: bool = True
 
+
 @attr.s(auto_attribs=True)
 class ProjectionParams(Parameters):
     type: str = 'torch.nn.Linear'
     # in_features: int = 50
     out_features: int = 13
+
 
 @attr.s(auto_attribs=True)
 class ModelParams(Parameters):
@@ -107,10 +113,12 @@ class ModelParams(Parameters):
     encoder: EncoderParams = attr.ib(default=attr.Factory(lambda: EncoderParams()))
     tag_projection: ProjectionParams = attr.ib(default=attr.Factory(lambda: ProjectionParams()))
 
+
 @attr.s(auto_attribs=True)
 class OptimizerParams(Parameters):
     type: str = 'torch.optim.Adam'
     lr: float = 0.001
+
 
 @attr.s(auto_attribs=True)
 class SGDOptimizerParams(OptimizerParams):
@@ -118,10 +126,12 @@ class SGDOptimizerParams(OptimizerParams):
     lr: float = 0.001
     momentum: float = 0.1
 
+
 @attr.s(auto_attribs=True)
 class TrainingParams(Parameters):
-    num_epochs: int = 30
+    num_epochs: int = 20
     optimizer: OptimizerParams = attr.ib(default=attr.Factory(lambda: OptimizerParams()))
+
 
 @attr.s(auto_attribs=True)
 class TaggingParams(Parameters):
@@ -150,6 +160,3 @@ class TaggingParams(Parameters):
 # params = TaggingParams()
 # params.model.encoder = [EncoderParams(),
 #                         RNNEncoderParams(hidden_size=[50, 100])]
-
-# import pandas as pd
-# pd.json_normalize(attr.asdict(params), sep='.')
