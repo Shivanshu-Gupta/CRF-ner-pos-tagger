@@ -1,9 +1,11 @@
 from typing import Dict, Union
 import torch
 import torch.nn as nn
+from typing import Optional
 
 from dataset import Vocabulary
 from metric import Accuracy, AccuracyPerLabel, Average
+from param import EncoderParams, ProjectionParams
 from util import load_embeddings, load_object_from_dict
 
 
@@ -13,8 +15,8 @@ class SimpleTagger(torch.nn.Module):
         token_vocab: Vocabulary,
         tag_vocab: Vocabulary,
         embedding_param: Union[int, str],
-        encoder: Dict,
-        tag_projection: Dict
+        encoder: Optional[EncoderParams],
+        tag_projection: ProjectionParams
     ):
         super(SimpleTagger, self).__init__()
         self._embeddings: nn.Embedding = load_embeddings(embedding_param=embedding_param, token_vocab=token_vocab)

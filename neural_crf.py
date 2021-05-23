@@ -4,10 +4,11 @@ from typing import Optional, Any
 import torch
 import torch.nn as nn
 
+import viterbi
 from dataset import Vocabulary
 from metric import Accuracy, AccuracyPerLabel, Average
+from param import EncoderParams, ProjectionParams
 from util import load_embeddings, load_object_from_dict
-import viterbi
 
 
 class ConditionalRandomField(torch.nn.Module):
@@ -251,8 +252,8 @@ class NeuralCrf(torch.nn.Module):
         token_vocab: Vocabulary,
         tag_vocab: Vocabulary,
         embedding_param: Union[int, str],
-        encoder: Dict,
-        tag_projection: Dict
+        encoder: Optional[EncoderParams],
+        tag_projection: ProjectionParams
     ):
         super(NeuralCrf, self).__init__()
         self._embeddings: nn.Embedding = load_embeddings(embedding_param=embedding_param, token_vocab=token_vocab)

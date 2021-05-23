@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument('--emb', action='store_true')
     parser.add_argument('--enc', type=int, default=0)
     parser.add_argument('--gpu_idx', type=int, default=-1)
+    parser.add_argument('--serialization_dir', type=str, default='models')
     parser.add_argument("-o", "--overwrite", action='store_true')
     parser.add_argument("--test", action='store_true')
     parser.add_argument("--silent", action='store_true')
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     config.gpu_idx = args.gpu_idx
     pprint(attr.asdict(config))
 
-    serialization_dir = f'models/{args.dataset}/{model_name}'
+    serialization_dir = os.path.join(args.serialization_dir, args.dataset, model_name)
     print(serialization_dir)
     # sys.exit()
     if os.path.isdir(serialization_dir) and not args.overwrite:

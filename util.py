@@ -1,7 +1,8 @@
 import ntpath
+from typing import Union
 import torch
 
-def load_embeddings(token_vocab, embedding_param='50'):
+def load_embeddings(token_vocab, embedding_param: Union[str, int] = 50):
     import torch
     glove = [f'embeddings/glove.twitter.27B.{dim}d.bin'
              for dim in [25, 50, 100, 200]]
@@ -36,7 +37,7 @@ def load_embeddings(token_vocab, embedding_param='50'):
         token_vocab.word_list = word_list
     else:
         # initialize embeddings randomly
-        embeddings = torch.nn.Embedding(len(token_vocab), int(embedding_param))
+        embeddings = torch.nn.Embedding(len(token_vocab), embedding_param)
 
     return embeddings
 
@@ -50,8 +51,9 @@ def create_object_from_class_string(module_name, class_name, parameters):
 
 
 def load_object_from_dict(parameters, **kwargs):
+    if parameters is None:
+        return None
     if not isinstance(parameters, dict):
-        # parameters = attr.asdict(parameters)
         parameters = vars(parameters).copy()
     parameters.update(kwargs)
     type = parameters.pop('type')
@@ -67,19 +69,6 @@ def get_device(gpu_idx):
     if gpu_idx != -1 and torch.cuda.is_available():
         device = f'cuda:{gpu_idx}'
     return device
-
-def nest_dict(flat, sep='.'):
-    result = {}
-    for k, v in flat.items():
-        _nest_dict_rec(k, v, result, sep=sep)
-    return result
-
-def _nest_dict_rec(k, v, out, sep='.'):
-    k, *rest = k.split(sep, 1)
-    if rest:
-        _nest_dict_rec(rest[0], v, out.setdefault(k, {}))
-    else:
-        out[k] = v
 
 def output(string, filepath=None, silent=False):
     if not silent: print(string)

@@ -65,7 +65,6 @@ def get_search_space(dataset='ner', model='simple', emb=True, enc=1, hyperopt=Fa
             type='torch.nn.LSTM',
             hidden_size=choices([50, 100]),
             num_layers=2,
-            # dropout=tune.uniform(0, 0.3),
             dropout=tune.grid_search(dropout_options) if not hyperopt else tune.uniform(0, 0.3),
             bidirectional=choices([True, False])
         )
