@@ -1,18 +1,14 @@
+import os
 import ntpath
 from typing import Union
 import torch
 
-def load_embeddings(token_vocab, embedding_param: Union[str, int] = 50):
-    import torch
-    glove = [f'embeddings/glove.twitter.27B.{dim}d.bin'
-             for dim in [25, 50, 100, 200]]
-    word2vec = ['embeddings/word2vec_twitter_tokens.bin']
-    fasttext = ['embeddings/fasttext_twitter_raw.bin']
-    valid_embedding_paths = set(glove + word2vec + fasttext)
+from param import valid_embeddings, embeddings_dir
 
-    # read in pretrained embeddings
-    if embedding_param in valid_embedding_paths:
-        embedding_path = embedding_param
+
+def load_embeddings(token_vocab, embedding_param: Union[str, int] = 50):
+    if embedding_param in valid_embeddings:     # read in pretrained embeddings
+        embedding_path = os.path.join(embeddings_dir, embedding_param)
         filename = ntpath.basename(embedding_path)
         if filename.startswith("word2vec") or filename.startswith("glove"):
             from gensim.models.keyedvectors import KeyedVectors
@@ -35,8 +31,7 @@ def load_embeddings(token_vocab, embedding_param: Union[str, int] = 50):
 
         # update word list in token vocabulary with words from embedding file
         token_vocab.word_list = word_list
-    else:
-        # initialize embeddings randomly
+    else:       # initialize embeddings randomly
         embeddings = torch.nn.Embedding(len(token_vocab), embedding_param)
 
     return embeddings
@@ -57,9 +52,7 @@ def load_object_from_dict(parameters, **kwargs):
         parameters = vars(parameters).copy()
     parameters.update(kwargs)
     type = parameters.pop('type')
-    if not type:
-        return None
-    else:
+    if type:
         type = type.split('.')
         module_name, class_name = '.'.join(type[:-1]), type[-1]
         return create_object_from_class_string(module_name, class_name, parameters)
@@ -100,15 +93,9 @@ def get_search_name(dataset='ner', model='simple', emb=True, enc=1, sep='-', hyp
     return sep.join(name)
 
 def get_model_name(model='simple', emb=True, enc=1, sep='-'):
-    name = []
-    if model == 'crf':
-        name.append('crf')
-    else:
-        name.append('simple')
-
+    name = [model]
     if emb:
         name.append('emb')
-
     if enc != 0:
         name.append('enc')
     return sep.join(name)

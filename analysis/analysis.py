@@ -4,21 +4,19 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 
-from param import *
-from search_analysis import load_analysis
+from param import datasets as all_datasets, model_types, models_dir
 from util import get_model_name, get_configuration_name
+from analysis.search_analysis import load_analysis
 
 def get_default_metrics(dataset='ner', model='simple'):
-    serialization_dir = f'models/{dataset}/{model}-default'
+    serialization_dir = os.path.join(models_dir, dataset, f'{model}-default')
     best_metrics = json.load(open(f'{serialization_dir}/best_metrics.json'))
     tst_metrics = json.load(open(f'{serialization_dir}/test_metrics.json'))
     best_metrics.update(tst_metrics)
     return best_metrics
 
 
-def table_accuracies(datasets=['ner', 'pos'],
-                     models=['simple', 'crf'],
-                     encs=[0, 1, 2],
+def table_accuracies(datasets=all_datasets, models=model_types, encs=[0, 1, 2],
                      metric='val_accuracy'):
     columns = ['Dataset', 'Model Type', 'Configuration', 'Dev Accuracy', 'Test Accuracy']
     full_df = pd.DataFrame(columns=columns)
@@ -35,7 +33,8 @@ def table_accuracies(datasets=['ner', 'pos'],
             full_df = full_df.append(row, ignore_index=True)
             for enc in encs:
                 for emb in [False, True]:
-                    serialization_dir = f'models/{dataset}/{get_model_name(model, emb, enc)}/'
+                    serialization_dir = os.path.join(models_dir, dataset,
+                                                     get_model_name(model, emb, enc))
                     if os.path.exists(f'{serialization_dir}/best_metrics.json'):
                         best_metrics = json.load(open(f'{serialization_dir}/best_metrics.json'))
                     else:
@@ -68,9 +67,8 @@ def table_accuracies(datasets=['ner', 'pos'],
     return table_df
 
 
-def table_most_changed_labels(datasets=['ner', 'pos'], models=['simple', 'crf'],
-                              encs=[0, 1, 2], metric='val_accuracy',
-                              k=3, hyperopt=False):
+def table_most_changed_labels(datasets=all_datasets, models=model_types, encs=[0, 1, 2],
+                              metric='val_accuracy', k=3, hyperopt=False):
     columns = ['Dataset', 'Model Type', 'Configuration', 'Most Changed Labels']
     table_df = pd.DataFrame(columns=columns)
 

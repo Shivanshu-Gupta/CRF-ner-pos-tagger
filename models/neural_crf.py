@@ -1,10 +1,10 @@
 from typing import List, Tuple, Dict, Union
-from typing import Optional, Any
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
-import viterbi
+from models import viterbi
 from dataset import Vocabulary
 from metric import Accuracy, AccuracyPerLabel, Average
 from param import EncoderParams, ProjectionParams

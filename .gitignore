@@ -1,6 +1,5 @@
 .DS_Store
 __pycache__
-models/
-embeddings/
-ray_results/
+inputs/embeddings/
+outputs/
 scratch.py

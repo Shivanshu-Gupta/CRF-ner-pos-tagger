@@ -1,14 +1,12 @@
-from param import *
-from search_analysis import get_best_configs
+from param import valid_embeddings, TaggingParams, EncoderParams
+from analysis.search_analysis import get_best_configs
 
 
-def get_default_tagger_params(dataset='ner', model='simple'):
+def get_default_tagger_params(dataset='ner', model='simple', emb=False, enc=0):
     params: TaggingParams = TaggingParams(dataset=dataset)
-    if model == 'crf':
-        params.model.type = 'neural_crf.NeuralCrf'
-    if dataset == 'pos':
-        params.training.num_epochs = 40
-    params.is_grid = False
+    if model == 'crf': params.model.type = 'models.neural_crf.NeuralCrf'
+    if emb: params.model.embedding_param = valid_embeddings[0]
+    if enc != 0: params.model.encoder = EncoderParams()
     return params
 
 
@@ -16,7 +14,6 @@ def get_best_tagger_params(dataset='ner', model='simple', emb=False, enc=0):
     best_configs = get_best_configs()
     params: TaggingParams = best_configs[(dataset, model, emb, enc)]
     params.search_name = ''
-    params.is_grid = False
     return params
 # Dataset   model    emb enc  Dev Accuracy                              embedding     lr
 # 0   ner  simple  False   0     95.295348                                     25  0.010

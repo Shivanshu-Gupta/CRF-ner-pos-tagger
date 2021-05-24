@@ -1,10 +1,24 @@
+import os
+import json
 import attr
 from typing import Union, Optional
 
 from parameters import get_default, Parameters
 
 datasets = ['ner', 'pos']
-models = ['simple', 'crf']
+model_types = ['simple', 'crf']
+glove = [f'glove.twitter.27B.{dim}d.bin' for dim in [25, 50, 100, 200]]
+word2vec = ['word2vec_twitter_tokens.bin']
+fasttext = ['fasttext_twitter_raw.bin']
+valid_embeddings = glove
+
+paths = json.load(open('paths.json'))
+data_dir = paths['data_dir']
+embeddings_dir = paths['embeddings_dir']
+log_dir = paths['log_dir']
+models_dir = paths['models_dir']
+ray_dir = paths['ray_dir']
+
 
 def disambiguate(o, t):
     lambdas = {
@@ -18,7 +32,7 @@ def disambiguate(o, t):
 
 @attr.s(auto_attribs=True)
 class DataParams(Parameters):
-    data_path: Optional[str] = None
+    data_path: str = os.path.join(data_dir, "twitter_train.ner")
     max_length: int = 30
 
 @attr.s(auto_attribs=True)
@@ -34,14 +48,14 @@ class EncoderParams(Parameters):
 @attr.s(auto_attribs=True)
 class ProjectionParams(Parameters):
     type: str = 'torch.nn.Linear'
-    out_features: int = 13
+    out_features: int = 22
 
 
 @attr.s(auto_attribs=True)
 class ModelParams(Parameters):
-    type: str = 'simple_tagger.SimpleTagger'
+    type: str = 'models.simple_tagger.SimpleTagger'
     embedding_param: Union[int, str] = 50
-    encoder: Optional[EncoderParams] = get_default(lambda: EncoderParams())
+    encoder: Optional[EncoderParams] = None
     tag_projection: ProjectionParams = get_default(lambda: ProjectionParams())
 
     @classmethod
@@ -78,24 +92,20 @@ class TaggingParams(Parameters):
     random_seed: int = 42
     gpu_idx: int = -1
     dataset: str = 'ner'
-    train_dataset: DataParams = get_default(lambda: DataParams(data_path="data/twitter_train.ner"))
-    validation_dataset: DataParams = get_default(lambda: DataParams(data_path="data/twitter_dev.ner"))
+    train_dataset: DataParams = get_default(lambda: DataParams(data_path=os.path.join(data_dir, "twitter_train.ner")))
+    validation_dataset: DataParams = get_default(lambda: DataParams(data_path=os.path.join(data_dir, "twitter_dev.ner")))
     train_batch_size: int = 32
     val_batch_size: int = 64
     model: ModelParams = get_default(lambda: ModelParams())
     training: TrainingParams = get_default(lambda: TrainingParams())
     search_name: str = ''
-    is_grid: bool = True
 
     def __attrs_post_init__(self):
-        if self.dataset == 'ner':
-            self.train_dataset.data_path = "data/twitter_train.ner"
-            self.validation_dataset.data_path = "data/twitter_dev.ner"
-            self.model.tag_projection.out_features = 22
-        else:
-            self.train_dataset.data_path = "data/twitter_train.pos"
-            self.validation_dataset.data_path = "data/twitter_dev.pos"
+        if self.dataset == 'pos':
+            self.train_dataset.data_path = os.path.join(data_dir, "twitter_train.pos")
+            self.validation_dataset.data_path = os.path.join(data_dir, "twitter_dev.pos")
             self.model.tag_projection.out_features = 13
+            self.training.num_epochs = 10
 
 # params = TaggingParams()
 # params.model.encoder = [EncoderParams(),
