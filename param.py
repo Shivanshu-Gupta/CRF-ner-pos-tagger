@@ -14,7 +14,7 @@ def disambiguate(o, t):
     if t in lambdas:
         return lambdas[t](o, t)
     else:
-        raise "Unknown Type"
+        raise TypeError("Unknown Type")
 
 @attr.s(auto_attribs=True)
 class DataParams(Parameters):

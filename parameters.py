@@ -114,9 +114,10 @@ class Parameters(DictDataClass):
                 else:
                     value_lists.append(v)
                 keys.append(k)
+        _setting = deepcopy(self)
         settings = []
         for values in product(*value_lists):
             for k, v in zip(keys, values):
-                setattr(self, k, v)
-            settings.append(deepcopy(self))
+                setattr(_setting, k, v)
+            settings.append(deepcopy(_setting))
         return settings
