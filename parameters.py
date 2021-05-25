@@ -30,8 +30,8 @@ def flatten_dict(d, sep='.', parent_key=''):
             flat_d[k] = v
     return flat_d
 
-def get_default(f):
-    return attr.ib(default=attr.Factory(f))
+def default_value(default):
+    return attr.ib(default=attr.Factory(lambda: default))
 
 
 @attr.s(auto_attribs=True)

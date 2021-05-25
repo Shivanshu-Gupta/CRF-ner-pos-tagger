@@ -3,7 +3,7 @@ import json
 import attr
 from typing import Union, Optional
 
-from parameters import get_default, Parameters
+from parameters import default_value, Parameters
 
 datasets = ['ner', 'pos']
 model_types = ['simple', 'crf']
@@ -56,7 +56,7 @@ class ModelParams(Parameters):
     type: str = 'models.simple_tagger.SimpleTagger'
     embedding_param: Union[int, str] = 50
     encoder: Optional[EncoderParams] = None
-    tag_projection: ProjectionParams = get_default(lambda: ProjectionParams())
+    tag_projection: ProjectionParams = default_value(ProjectionParams())
 
     @classmethod
     def get_disambiguators(cls):
@@ -80,7 +80,7 @@ class SGDOptimizerParams(Parameters):
 class TrainingParams(Parameters):
     num_epochs: int = 20
     optimizer: Union[AdamOptimizerParams,
-                     SGDOptimizerParams] = get_default(lambda: AdamOptimizerParams())
+                     SGDOptimizerParams] = default_value(AdamOptimizerParams())
 
     @classmethod
     def get_disambiguators(cls):
@@ -92,12 +92,12 @@ class TaggingParams(Parameters):
     random_seed: int = 42
     gpu_idx: int = -1
     dataset: str = 'ner'
-    train_dataset: DataParams = get_default(lambda: DataParams(data_path=os.path.join(data_dir, "twitter_train.ner")))
-    validation_dataset: DataParams = get_default(lambda: DataParams(data_path=os.path.join(data_dir, "twitter_dev.ner")))
+    train_dataset: DataParams = default_value(DataParams(data_path=os.path.join(data_dir, "twitter_train.ner")))
+    validation_dataset: DataParams = default_value(DataParams(data_path=os.path.join(data_dir, "twitter_dev.ner")))
     train_batch_size: int = 32
     val_batch_size: int = 64
-    model: ModelParams = get_default(lambda: ModelParams())
-    training: TrainingParams = get_default(lambda: TrainingParams())
+    model: ModelParams = default_value(ModelParams())
+    training: TrainingParams = default_value(TrainingParams())
     search_name: str = ''
 
     def __attrs_post_init__(self):
