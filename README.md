@@ -1,4 +1,4 @@
-# HW3: Sequence Tagging on Tweets
+# Sequence Tagging on Tweets
 
 You will need to download `data.tar.gz` file from the course website, and *uncompress* it into the `data` folder inside `hw3` (if you put it elsewhere, change the location in the code). 
 You will need Python3 and the Python packages `torch` and `tqdm`. 
